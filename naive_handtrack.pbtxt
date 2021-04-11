@@ -1,0 +1,57 @@
+# MediaPipe graph that performs hand tracking with TensorFlow Lite on CPU.
+# Used in the examples in
+# mediapipe/examples/android/src/java/com/mediapipe/apps/handtrackinggpu and
+# mediapipe/examples/ios/handtrackinggpu.
+
+# Images coming into and out of the graph.
+input_stream: "input_frames_gpu"
+output_stream: "output_frames_gpu"
+
+max_queue_size: 100
+
+executor: {
+  name: ""
+  type: "ApplicationThreadExecutor"
+}
+
+# For selfie-mode testing, we flip horizontally here.
+node: {
+  calculator: "ImageTransformationCalculator"
+  input_stream: "IMAGE_GPU:input_frames_gpu"
+  output_stream: "IMAGE_GPU:input_video_gpu"
+  node_options: {
+    [type.googleapis.com/mediapipe.ImageTransformationCalculatorOptions]: {
+      flip_horizontally: true
+    }
+  }
+}
+
+# Subgraph that detections hands (see hand_detection_gpu.pbtxt).
+node {
+  calculator: "HandDetectionSubgraph"
+  input_stream: "input_video_gpu"
+  output_stream: "DETECTIONS:palm_detections"
+  output_stream: "NORM_RECT:hand_rect_from_palm_detections"
+}
+
+# Subgraph that localizes hand landmarks (see hand_landmark_gpu.pbtxt).
+node {
+  calculator: "HandLandmarkSubgraph"
+  input_stream: "IMAGE:input_video_gpu"
+  input_stream: "NORM_RECT:hand_rect_from_palm_detections"
+  output_stream: "LANDMARKS:hand_landmarks"
+  output_stream: "NORM_RECT:hand_rect_from_landmarks"
+  output_stream: "HANDEDNESS:handedness"
+}
+
+# Subgraph that renders annotations and overlays them on top of the input
+# images (see renderer_gpu.pbtxt).
+node {
+  calculator: "RendererSubgraph"
+  input_stream: "IMAGE:input_video_gpu"
+  input_stream: "LANDMARKS:hand_landmarks"
+  input_stream: "NORM_RECT:hand_rect_from_landmarks"
+  input_stream: "DETECTIONS:palm_detections"
+  input_stream: "HANDEDNESS:handedness"
+  output_stream: "IMAGE:output_frames_gpu"
+}
